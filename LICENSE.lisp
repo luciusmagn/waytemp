@@ -10,21 +10,25 @@
 (use-package :serapeum)
 
 (defun license ()
-  (~> '((copyright   . "2025 Lukáš Hozda")
-        (permissions . (use copy modify distribute sell))
-        (conditions  . (retain-notice))
-        (limitations . (no-warranty no-liability)))
-      (dict)
-      (progn
-        (dict-insert 'variant
-                     (cond
-                       ((null (@ _ 'copyright))                                    "COLL-PublicDomain")
-                       ((subset '(same-license disclose-source) (@ _ 'conditions)) "COLL-Copyleft")
-                       ((member 'same-license (@ _ 'conditions))                   "COLL-ShareAlike")
-                       ((not (member 'sell (@ _ 'permissions)))                    "COLL-NonCommercial")
-                       ((member 'retain-notice (@ _ 'conditions))                  "COLL-Attribution")
-                       (t                                                          "COLL-Permissive"))
-                     _))))
+  (~> '((copyright . "2025 Lukáš Hozda"))
+      (append '((permissions . (use copy modify distribute sell))))
+      (append '((conditions  . (retain-notice))))
+      (append '((limitations . (no-warranty no-liability))))
+      ((lambda (config)
+         (acons 'variant
+                (cond
+                  ((null (assocdr 'copyright config))
+                   "COLL-PublicDomain")
+                  ((subsetp '(same-license disclose-source) (assocdr 'conditions config))
+                   "COLL-Copyleft")
+                  ((member 'same-license (assocdr 'conditions config))
+                   "COLL-ShareAlike")
+                  ((not (member 'sell (assocdr 'permissions config)))
+                   "COLL-NonCommercial")
+                  ((member 'retain-notice (assocdr 'conditions config))
+                   "COLL-Attribution")
+                  (t "COLL-Permissive"))
+                config)))))
 
 ;; LEGAL TERMS AND CONDITIONS
 ;;
