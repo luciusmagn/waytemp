@@ -101,7 +101,7 @@
                   (loop until *should-quit* do
                     (handler-case
                         (iolib:wait-until-fd-ready
-                         (iolib:socket-os-fd server) :input :timeout 0.1)
+                         (iolib:socket-os-fd server) :input 0.1)
                       (iolib:poll-timeout () nil))
 
                     (when (iolib:fd-ready-p (iolib:socket-os-fd server) :input)

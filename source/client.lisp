@@ -6,7 +6,7 @@
       (let ((socket (iolib:make-socket :address-family :local
                                        :type :stream
                                        :connect :active
-                                       :local-filename *socket-path*)))
+                                       :remote-filename *socket-path*)))  ; <- changed
         (unwind-protect
              (progn
                (prin1 (cons command args) socket)

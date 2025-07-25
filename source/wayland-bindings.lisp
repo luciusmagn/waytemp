@@ -35,14 +35,43 @@
 (cffi:defcfun "wl_display_dispatch" :int
   (display wl-display))
 
-(cffi:defcfun "wl_display_get_registry" wl-registry
-  (display wl-display))
 
-(cffi:defcfun "wl_registry_bind" wl-proxy
-  (registry wl-registry)
-  (name :uint32)
+(defconstant +wl-display-get-registry+ 1)
+(defconstant +wl-registry-bind+ 0)
+
+(cffi:defcfun "wl_proxy_get_version" :uint32
+  (proxy wl-proxy))
+
+(cffi:defcfun ("wl_proxy_marshal_flags" wl-proxy-marshal-flags) wl-proxy
+  (proxy wl-proxy)
+  (opcode :uint32)
   (interface :pointer)
-  (version :uint32))
+  (version :uint32)
+  (flags :uint32)
+  &rest)
+
+(defun wl-display-get-registry (display)
+  "Get the registry object for a display."
+  (wl-proxy-marshal-flags display
+                          +wl-display-get-registry+
+                          (cffi:foreign-symbol-pointer "wl_registry_interface")
+                          (wl-proxy-get-version display)
+                          0
+                          :pointer (cffi:null-pointer)))
+
+
+(defun wl-registry-bind (registry name interface version)
+  "Bind to a global object."
+  (wl-proxy-marshal-flags
+   registry
+   +wl-registry-bind+
+   interface
+   version
+   0
+   :uint32 name
+   :string (cffi:foreign-slot-value interface '(:struct wl-interface) 'name)
+   :uint32 version
+   :pointer (cffi:null-pointer)))
 
 (cffi:defcfun "wl_proxy_add_listener" :int
   (proxy wl-proxy)
@@ -108,14 +137,17 @@
   (cond
     ((string= interface "wl_output")
      (format t "~&Registry: adding output ~D~%" name)
-     (init-output-listener)  ; Make sure listener is initialized
+     (init-output-listener)
      (let* ((output-ptr (wl-registry-bind registry name
-                                          (cffi:foreign-slot-pointer
-                                           (cffi:foreign-symbol-pointer "wl_output_interface")
-                                           '(:struct wl-interface) 'name)
+                                          (cffi:foreign-symbol-pointer "wl_output_interface")
                                           4))
             (output (make-wl-output :id name
+                                    :name nil
                                     :wl-output-ptr output-ptr
+                                    :gamma-control-ptr (cffi:null-pointer)
+                                    :ramp-size 0
+                                    :table-fd -1
+                                    :table-ptr (cffi:null-pointer)
                                     :enabled t)))
        (setf (gethash name *outputs*) output)
        (wl-proxy-add-listener output-ptr
@@ -126,9 +158,7 @@
      (format t "~&Found gamma control manager~%")
      (setf *gamma-control-manager*
            (wl-registry-bind registry name
-                             (cffi:foreign-slot-pointer
-                              (get-gamma-control-manager-interface)
-                              '(:struct wl-interface) 'name)
+                             (get-gamma-control-manager-interface)
                              1)))))
 
 (cffi:defcallback registry-global-remove :void
@@ -234,30 +264,51 @@
 ;;; Gamma control protocol
 (defun get-gamma-control-manager-interface ()
   "Return pointer to zwlr_gamma_control_manager_v1_interface"
-  (let ((interface (cffi:foreign-alloc '(:struct wl-interface))))
-    (cffi:with-foreign-string (name "zwlr_gamma_control_manager_v1")
-      (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'name)
-            name)
-      (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'version)
-            1)
-      (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'method-count)
-            2)
-      (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'methods)
-            (cffi:null-pointer))
-      (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'event-count)
-            0)
-      (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'events)
-            (cffi:null-pointer)))
+  (let ((interface (cffi:foreign-alloc '(:struct wl-interface)))
+        (name (cffi:foreign-string-alloc "zwlr_gamma_control_manager_v1")))
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'name)
+          name)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'version)
+          1)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'method-count)
+          2)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'methods)
+          (cffi:null-pointer))
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'event-count)
+          0)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'events)
+          (cffi:null-pointer))
+    interface))
+
+(defun get-gamma-control-interface ()
+  "Return pointer to zwlr_gamma_control_v1_interface"
+  (let ((interface (cffi:foreign-alloc '(:struct wl-interface)))
+        (name (cffi:foreign-string-alloc "zwlr_gamma_control_v1")))
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'name)
+          name)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'version)
+          1)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'method-count)
+          2)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'methods)
+          (cffi:null-pointer))
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'event-count)
+          2)
+    (setf (cffi:foreign-slot-value interface '(:struct wl-interface) 'events)
+          (cffi:null-pointer))
     interface))
 
 (cffi:defcallback gamma-control-gamma-size :void
     ((data :pointer)
      (gamma-control :pointer)
      (ramp-size :uint32))
-  (declare (ignore data gamma-control))
+  (declare (ignore data))
   (maphash (lambda (id output)
              (declare (ignore id))
-             (when (cffi:pointer-eq (wl-output-gamma-control-ptr output) gamma-control)
+             (when (and (wl-output-gamma-control-ptr output)
+                        (not (cffi:null-pointer-p (wl-output-gamma-control-ptr output)))
+                        (cffi:pointer-eq (wl-output-gamma-control-ptr output) gamma-control))
+               (format t "~&Gamma control: ramp size ~D~%" ramp-size)
                (setf (wl-output-ramp-size output) ramp-size)
                (when (> ramp-size 0)
                  (multiple-value-bind (fd table-ptr)
@@ -293,13 +344,15 @@
 
 (defun setup-gamma-control (output)
   "Set up gamma control for an output"
-  (init-gamma-control-listener)  ; Make sure listener is initialized
-  (let ((gamma-control (cffi:foreign-funcall-pointer
+  (init-gamma-control-listener)
+  (let ((gamma-control (wl-proxy-marshal-flags
                         *gamma-control-manager*
-                        ()
-                        wl-proxy *gamma-control-manager*
-                        wl-proxy (wl-output-wl-output-ptr output)
-                        :pointer)))
+                        0  ; get_gamma_control opcode
+                        (get-gamma-control-interface)
+                        1  ; version
+                        0  ; flags
+                        :pointer (wl-output-wl-output-ptr output)
+                        :pointer (cffi:null-pointer))))
     (setf (wl-output-gamma-control-ptr output) gamma-control)
     (wl-proxy-add-listener gamma-control
                            *gamma-control-listener*
@@ -344,14 +397,15 @@
   "Apply gamma table to output"
   (c-lseek (wl-output-table-fd output) 0 +seek-set+)
 
-  ;; Call zwlr_gamma_control_v1_set_gamma
-  (cffi:foreign-funcall-pointer
+  ;; Call zwlr_gamma_control_v1_set_gamma using marshal
+  (wl-proxy-marshal-flags
    (wl-output-gamma-control-ptr output)
-   ()
-   :pointer (wl-output-gamma-control-ptr output)
-   :int +zwlr-gamma-control-v1-set-gamma+
-   :int (wl-output-table-fd output)
-   :void))
+   +zwlr-gamma-control-v1-set-gamma+
+   (cffi:null-pointer)  ; no new interface
+   0  ; version
+   0  ; flags
+   :int32 (wl-output-table-fd output)
+   :pointer (cffi:null-pointer)))
 
 ;;; Main connection handling
 (defparameter *display* nil)
@@ -360,6 +414,7 @@
 
 (defun init-wayland-connection ()
   "Initialize Wayland connection"
+  (cffi:use-foreign-library libwayland-client)
   (setf *display* (wl-display-connect (cffi:null-pointer)))
   (when (cffi:null-pointer-p *display*)
     (error "Failed to connect to Wayland display"))
