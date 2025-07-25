@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <unistd.h>
 #include <wayland-client.h>
 
@@ -19,6 +20,8 @@ struct output {
   uint32_t ramp_size;
   int table_fd;
   uint16_t *table;
+  time_t last_retry;
+  int retry_count;
 };
 
 struct waytemp_ctx {
@@ -26,6 +29,8 @@ struct waytemp_ctx {
   struct wl_registry *registry;
   struct zwlr_gamma_control_manager_v1 *gamma_control_manager;
   struct wl_list outputs;
+  int last_temp;
+  double last_gamma;
 };
 
 static int illuminant_d(int temp, double *x, double *y) {
@@ -145,16 +150,22 @@ static void gamma_control_handle_gamma_size(
   struct output *output = data;
   output->ramp_size = size;
   if (size > 0) {
+    if (output->table_fd >= 0) {
+      close(output->table_fd);
+    }
     output->table_fd = create_gamma_table(size, &output->table);
+    output->retry_count = 0; // Reset retry count on success
   }
 }
 
 static void gamma_control_handle_failed(void *data,
                                         struct zwlr_gamma_control_v1 *control) {
   struct output *output = data;
-  fprintf(stderr, "gamma control failed\n");
+  fprintf(stderr, "gamma control failed, will retry\n");
   zwlr_gamma_control_v1_destroy(output->gamma_control);
   output->gamma_control = NULL;
+  output->last_retry = time(NULL);
+  output->retry_count++;
 }
 
 static const struct zwlr_gamma_control_v1_listener gamma_control_listener = {
@@ -172,6 +183,8 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
     output->wl_output =
         wl_registry_bind(registry, name, &wl_output_interface, 1);
     output->table_fd = -1;
+    output->last_retry = 0;
+    output->retry_count = 0;
     wl_list_insert(&ctx->outputs, &output->link);
   } else if (strcmp(interface, zwlr_gamma_control_manager_v1_interface.name) ==
              0) {
@@ -191,9 +204,23 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = registry_handle_global_remove,
 };
 
+static void setup_gamma_control(struct waytemp_ctx *ctx,
+                                struct output *output) {
+  if (!ctx->gamma_control_manager || output->gamma_control) {
+    return;
+  }
+
+  output->gamma_control = zwlr_gamma_control_manager_v1_get_gamma_control(
+      ctx->gamma_control_manager, output->wl_output);
+  zwlr_gamma_control_v1_add_listener(output->gamma_control,
+                                     &gamma_control_listener, output);
+}
+
 waytemp_ctx *waytemp_init(void) {
   struct waytemp_ctx *ctx = calloc(1, sizeof(struct waytemp_ctx));
   wl_list_init(&ctx->outputs);
+  ctx->last_temp = 6500;
+  ctx->last_gamma = 1.0;
 
   ctx->display = wl_display_connect(NULL);
   if (!ctx->display) {
@@ -213,10 +240,7 @@ waytemp_ctx *waytemp_init(void) {
   // Setup gamma controls for all outputs
   struct output *output;
   wl_list_for_each(output, &ctx->outputs, link) {
-    output->gamma_control = zwlr_gamma_control_manager_v1_get_gamma_control(
-        ctx->gamma_control_manager, output->wl_output);
-    zwlr_gamma_control_v1_add_listener(output->gamma_control,
-                                       &gamma_control_listener, output);
+    setup_gamma_control(ctx, output);
   }
   wl_display_roundtrip(ctx->display);
 
@@ -248,8 +272,23 @@ int waytemp_set_temperature(waytemp_ctx *ctx, int temp, double gamma) {
 
   fprintf(stderr, "Setting temp %dK: R=%.3f G=%.3f B=%.3f\n", temp, r, g, b);
 
+  // Store last values for retry
+  ctx->last_temp = temp;
+  ctx->last_gamma = gamma;
+
   struct output *output;
   wl_list_for_each(output, &ctx->outputs, link) {
+    // Retry failed outputs after 2 seconds
+    if (!output->gamma_control && output->retry_count < 10) {
+      time_t now = time(NULL);
+      if (now - output->last_retry >= 2) {
+        fprintf(stderr, "Retrying gamma control setup (attempt %d)\n",
+                output->retry_count + 1);
+        setup_gamma_control(ctx, output);
+        wl_display_roundtrip(ctx->display);
+      }
+    }
+
     if (!output->gamma_control || output->table_fd < 0 ||
         output->ramp_size == 0)
       continue;
@@ -274,5 +313,28 @@ int waytemp_set_temperature(waytemp_ctx *ctx, int temp, double gamma) {
 }
 
 int waytemp_process_events(waytemp_ctx *ctx) {
-  return wl_display_dispatch(ctx->display);
+  int ret = wl_display_dispatch(ctx->display);
+
+  // Periodically retry setting temperature in case of failures
+  static time_t last_retry_check = 0;
+  time_t now = time(NULL);
+  if (now - last_retry_check >= 5) {
+    last_retry_check = now;
+
+    // Check if any outputs need retry
+    struct output *output;
+    int need_retry = 0;
+    wl_list_for_each(output, &ctx->outputs, link) {
+      if (!output->gamma_control && output->retry_count < 10) {
+        need_retry = 1;
+        break;
+      }
+    }
+
+    if (need_retry) {
+      waytemp_set_temperature(ctx, ctx->last_temp, ctx->last_gamma);
+    }
+  }
+
+  return ret;
 }
