@@ -194,11 +194,11 @@
 (cffi:defcallback output-done :void
     ((data :pointer)
      (wl-output wl-output))
-  (declare (ignore data wl-output))
-  ;; When output is done, set up gamma control
+  (declare (ignore data))
   (maphash (lambda (id output)
              (declare (ignore id))
-             (when (and (wl-output-enabled output)
+             (when (and (cffi:pointer-eq (wl-output-wl-output-ptr output) wl-output)
+                        (wl-output-enabled output)
                         (not (wl-output-gamma-control-ptr output))
                         *gamma-control-manager*)
                (setup-gamma-control output)))
@@ -308,13 +308,14 @@
              (when (and (wl-output-gamma-control-ptr output)
                         (not (cffi:null-pointer-p (wl-output-gamma-control-ptr output)))
                         (cffi:pointer-eq (wl-output-gamma-control-ptr output) gamma-control))
-               (format t "~&Gamma control: ramp size ~D~%" ramp-size)
+               (format t "~&Gamma control: ramp size ~D for output ~D~%" ramp-size (wl-output-id output))
                (setf (wl-output-ramp-size output) ramp-size)
                (when (> ramp-size 0)
                  (multiple-value-bind (fd table-ptr)
                      (create-gamma-table ramp-size)
                    (setf (wl-output-table-fd output) fd)
-                   (setf (wl-output-table-ptr output) table-ptr)))))
+                   (setf (wl-output-table-ptr output) table-ptr)
+                   (update-all-outputs)))))
            *outputs*))
 
 (cffi:defcallback gamma-control-failed :void

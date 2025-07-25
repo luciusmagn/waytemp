@@ -136,6 +136,8 @@
       (progn
         (init-wayland-connection)
         (wl-display-roundtrip *display*)
+        ;; Extra roundtrip to ensure gamma_size events are processed
+        (wl-display-roundtrip *display*)
         (update-all-outputs))
     (error (e)
       (format *error-output* "~&Failed to initialize Wayland: ~A~%" e)
