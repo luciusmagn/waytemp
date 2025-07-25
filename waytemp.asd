@@ -5,6 +5,7 @@
   :version "0.1.0"
   :serial t
   :depends-on (#:cffi
+               #:clingon
                #:iolib
                #:alexandria
                #:bordeaux-threads)
