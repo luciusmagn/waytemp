@@ -1,10 +1,42 @@
 (in-package #:waytemp)
 
-(cffi:define-foreign-library waytemp-core
-  (:unix (:or "./c/libwaytemp_core.so"
-              "libwaytemp_core.so")))
+(defparameter *waytemp-core-loaded* nil)
 
-(cffi:use-foreign-library waytemp-core)
+(defun try-load-waytemp-core ()
+  "Try to load the waytemp core library from various locations"
+  (unless *waytemp-core-loaded*
+    (let ((search-paths
+            (list
+             ;; Development path (when running from source)
+             (when (asdf:find-system :waytemp nil)
+               (asdf:system-relative-pathname :waytemp "c/libwaytemp_core.so"))
+             ;; Standard system paths
+             #P"/usr/local/lib/libwaytemp_core.so"
+             #P"/usr/lib/libwaytemp_core.so"
+             #P"/usr/lib64/libwaytemp_core.so"
+             ;; Relative to executable
+             (merge-pathnames "libwaytemp_core.so"
+                              (uiop:pathname-directory-pathname
+                               (or (uiop:argv0) *default-pathname-defaults*)))
+             ;; Let system find it
+             "libwaytemp_core.so")))
+
+      (loop for path in search-paths
+            when path do
+              (handler-case
+                  (progn
+                    (cffi:load-foreign-library path)
+                    (setf *waytemp-core-loaded* t)
+                    (format *error-output* "~&Loaded waytemp core from: ~A~%" path)
+                    (return t))
+                (cffi:load-foreign-library-error ()
+                  nil)))
+
+      (unless *waytemp-core-loaded*
+        (error "Could not find libwaytemp_core.so in any of the search paths")))))
+
+;; Load the library
+(try-load-waytemp-core)
 
 (cffi:defcfun ("waytemp_init" %waytemp-init) :pointer)
 (cffi:defcfun ("waytemp_destroy" %waytemp-destroy) :void
