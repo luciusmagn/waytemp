@@ -2,33 +2,29 @@
 
 (defparameter *waytemp-core-loaded* nil)
 
-
 (defun try-load-waytemp-core ()
   "Try to load the waytemp core library from various locations"
   (unless *waytemp-core-loaded*
-    (let ((search-paths
-            (list
-             ;; System paths first
-             #P"/usr/lib/libwaytemp_core.so"
-             #P"/usr/local/lib/libwaytemp_core.so"
-             #P"/usr/lib64/libwaytemp_core.so"
-             ;; Development path (only if exists)
+    (let* ((dev-path
              (when (asdf:find-system :waytemp nil)
-               (let ((dev-path (asdf:system-relative-pathname :waytemp "c/libwaytemp_core.so")))
-                 (when (probe-file dev-path) dev-path)))
-             ;; Let dlopen search
-             "libwaytemp_core.so")))
+               (asdf:system-relative-pathname :waytemp "c/libwaytemp_core.so")))
+           (search-paths
+             (if (and dev-path (probe-file dev-path))
+                 (list dev-path)
+                 (list #P"/usr/lib/libwaytemp_core.so"
+                       #P"/usr/local/lib/libwaytemp_core.so"
+                       #P"/usr/lib64/libwaytemp_core.so"
+                       "libwaytemp_core.so"))))
 
-      (loop for path in search-paths
-            when path do
-              (handler-case
-                  (progn
-                    (cffi:load-foreign-library path)
-                    (setf *waytemp-core-loaded* t)
-                    (format *error-output* "~&Loaded waytemp core from: ~A~%" path)
-                    (return t))
-                (error ()  ; Catch ALL errors
-                  nil)))
+      (loop for path in search-paths do
+        (handler-case
+            (progn
+              (cffi:load-foreign-library path)
+              (setf *waytemp-core-loaded* t)
+              (format *error-output* "~&Loaded waytemp core from: ~A~%" path)
+              (return t))
+          (simple-error () nil)
+          (error () nil)))
 
       (unless *waytemp-core-loaded*
         (error "Could not find libwaytemp_core.so")))))
@@ -36,12 +32,15 @@
 (try-load-waytemp-core)
 
 (cffi:defcfun ("waytemp_init" %waytemp-init) :pointer)
+
 (cffi:defcfun ("waytemp_destroy" %waytemp-destroy) :void
   (ctx :pointer))
+
 (cffi:defcfun ("waytemp_set_temperature" %waytemp-set-temperature) :int
   (ctx :pointer)
   (temp :int)
   (gamma :double))
+
 (cffi:defcfun ("waytemp_process_events" %waytemp-process-events) :int
   (ctx :pointer))
 
