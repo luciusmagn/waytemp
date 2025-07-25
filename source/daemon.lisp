@@ -5,17 +5,6 @@
 (defparameter *gamma* 1.0d0)
 (defparameter *daemon-thread* nil)
 (defparameter *should-quit* nil)
-(defparameter *outputs* (make-hash-table :test 'eql))
-
-(defstruct wl-output
-  id
-  name
-  wl-output-ptr
-  gamma-control-ptr
-  ramp-size
-  table-fd
-  table-ptr
-  enabled)
 
 (defun handle-client-message (message)
   "Process a client message and return response."
@@ -26,17 +15,17 @@
            (let ((temp (first args)))
              (when (and (numberp temp) (>= temp 1000) (<= temp 25000))
                (setf *current-temp* temp)
-               (update-all-outputs)
+               (update-temperature)
                `(ok ,*current-temp*))))
           (inc-temp
            (let ((delta (or (first args) 100)))
              (setf *current-temp* (min 25000 (+ *current-temp* delta)))
-             (update-all-outputs)
+             (update-temperature)
              `(ok ,*current-temp*)))
           (dec-temp
            (let ((delta (or (first args) 100)))
              (setf *current-temp* (max 1000 (- *current-temp* delta)))
-             (update-all-outputs)
+             (update-temperature)
              `(ok ,*current-temp*)))
           (get-temp
            `(ok ,*current-temp*))
@@ -44,7 +33,7 @@
            (let ((gamma (first args)))
              (when (and (numberp gamma) (> gamma 0))
                (setf *gamma* (coerce gamma 'double-float))
-               (update-all-outputs)
+               (update-temperature)
                `(ok ,*gamma*))))
           (get-gamma
            `(ok ,*gamma*))
@@ -54,29 +43,21 @@
     (error (e)
       `(error ,(format nil "~A" e)))))
 
-(defun update-all-outputs ()
-  "Update color temperature on all outputs."
-  (let ((wp (calc-whitepoint *current-temp*)))
-    (format t "~&Setting temperature to ~D K~%" *current-temp*)
-    (maphash (lambda (id output)
-               (declare (ignore id))
-               (when (and (wl-output-enabled output)
-                          (wl-output-gamma-control-ptr output)
-                          (not (cffi:null-pointer-p (wl-output-gamma-control-ptr output)))
-                          (> (wl-output-ramp-size output) 0)
-                          (>= (wl-output-table-fd output) 0))
-                 (write-gamma-table (wl-output-table-ptr output)
-                                    (wl-output-ramp-size output)
-                                    wp
-                                    *gamma*)
-                 (set-gamma-control output)))
-             *outputs*)))
+(defun update-temperature ()
+  "Update color temperature using the C core"
+  (handler-case
+      (progn
+        (set-temperature-core *current-temp* *gamma*)
+        (format t "~&Set temperature to ~D K (gamma: ~,2F)~%"
+                *current-temp* *gamma*))
+    (error (e)
+      (format *error-output* "~&Failed to set temperature: ~A~%" e))))
 
 (defun wayland-event-loop ()
   "Process Wayland events while daemon is running."
-  (loop while (and (not *should-quit*) *display*)
+  (loop while (and (not *should-quit*) *waytemp-ctx*)
         do (handler-case
-               (wl-display-dispatch *display*)
+               (process-waytemp-events)
              (error (e)
                (format *error-output* "~&Wayland error: ~A~%" e)
                (return)))))
@@ -131,16 +112,13 @@
 
   (setf *should-quit* nil)
 
-  ;; Initialize Wayland connection
+  ;; Initialize Wayland connection through C library
   (handler-case
       (progn
-        (init-wayland-connection)
-        (wl-display-roundtrip *display*)
-        ;; Extra roundtrip to ensure gamma_size events are processed
-        (wl-display-roundtrip *display*)
-        (update-all-outputs))
+        (init-waytemp-core)
+        (update-temperature))
     (error (e)
-      (format *error-output* "~&Failed to initialize Wayland: ~A~%" e)
+      (format *error-output* "~&Failed to initialize waytemp core: ~A~%" e)
       (return-from start-daemon nil)))
 
   (setf *daemon-thread*
@@ -153,4 +131,4 @@
   (setf *should-quit* t)
   (when (and *daemon-thread* (bt:thread-alive-p *daemon-thread*))
     (bt:join-thread *daemon-thread*))
-  (cleanup-wayland-connection))
+  (cleanup-waytemp-core))

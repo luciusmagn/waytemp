@@ -11,11 +11,15 @@
   :components ((:module "source"
                 :components
                 ((:file "package")
-                 (:file "color-math")
-                 (:file "wayland-bindings")
+                 (:file "waytemp-core-ffi")
                  (:file "daemon")
                  (:file "client")
                  (:file "main"))))
   :build-operation "program-op"
   :build-pathname "waytemp"
-  :entry-point "waytemp:main")
+  :entry-point "waytemp:main"
+  :perform (asdf:compile-op :before (op c)
+                            (let ((makefile (asdf:system-relative-pathname "waytemp" "c/Makefile")))
+                              (uiop:run-program (list "make" "-C" (namestring (uiop:pathname-directory-pathname makefile)))
+                                                :output :interactive
+                                                :error-output :interactive))))
