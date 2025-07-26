@@ -12,7 +12,7 @@
 (defmethod print-object ((obj config) stream)
   (if *print-readably*
       (format stream
-              "~@<(make-instance 'waytemp:~s :temperature ~s :gamma ~s)~>"
+              "~@<(make-instance '~s :temperature ~s :gamma ~s)~>"
               (class-name (class-of obj))
               (config-temperature obj)
               (config-gamma obj))
