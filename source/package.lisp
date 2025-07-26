@@ -1,8 +1,8 @@
 (defpackage #:waytemp
-  (:use #:cl)
+  (:use #:cl #:serapeum)
   (:import-from #:clingon)
-  (:import-from #:serapeum #:~>)
   (:export #:main
            #:start-daemon
            #:stop-daemon
-           #:send-command))
+           #:send-command
+           #:config))

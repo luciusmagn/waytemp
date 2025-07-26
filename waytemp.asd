@@ -16,6 +16,7 @@
                  (:file "waytemp-core-ffi")
                  (:file "daemon")
                  (:file "client")
+                 (:file "config")
                  (:file "main"))))
   :build-operation "program-op"
   :build-pathname "waytemp"

@@ -91,6 +91,15 @@
      (~> (send-command 'quit)
          (print-response)))))
 
+(defun waytemp/save-config ()
+  (clingon:make-command
+   :name "save-config"
+   :description "Save the config to current values"
+   :handler
+   (lambda (cmd)
+     (declare (ignore cmd))
+     (~> (send-command 'save-config)
+         (print-response)))))
 
 (defun waytemp/command ()
   "The waytemp application"
@@ -107,6 +116,7 @@
                        (waytemp/inc)
                        (waytemp/dec)
                        (waytemp/gamma)
+                       (waytemp/save-config)
                        (waytemp/quit))
    :handler (lambda (cmd)
               (clingon:print-usage cmd t))))

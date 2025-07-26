@@ -37,6 +37,12 @@
                `(ok ,*gamma*))))
           (get-gamma
            `(ok ,*gamma*))
+          (save-config
+           (config-save (make-instance 'config
+                                       :temperature *current-temp*
+                                       :gamma *gamma*)
+                        (config-path))
+           `(ok saved))
           (quit
            (setf *should-quit* t)
            '(ok bye))))
@@ -75,7 +81,6 @@
          (progn
            (format t "~&Daemon listening on ~A~%" *socket-path*)
 
-           ;; Start Wayland event loop in separate thread
            (let ((wayland-thread (bt:make-thread #'wayland-event-loop
                                                  :name "waytemp-wayland")))
              (unwind-protect
@@ -110,9 +115,18 @@
   (when (and *daemon-thread* (bt:thread-alive-p *daemon-thread*))
     (error "Daemon already running"))
 
+  (handler-case
+      (let ((config (config-load (config-path))))
+        (setf *current-temp* (config-temperature config))
+        (setf *gamma*        (config-gamma config)))
+    (error (e)
+      (format t "Could not load config from ~A: ~%" e)
+      (format t "Using default values of:~%")
+      (format t "  Temperature:~A~%" *current-temp*)
+      (format t "  Gamma~A~%:" *gamma*)))
+
   (setf *should-quit* nil)
 
-  ;; Initialize Wayland connection through C library
   (handler-case
       (progn
         (init-waytemp-core)
