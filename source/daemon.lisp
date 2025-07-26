@@ -120,7 +120,7 @@
         (setf *current-temp* (config-temperature config))
         (setf *gamma*        (config-gamma config)))
     (error (e)
-      (format t "Could not load config from ~A: ~%" e)
+      (format t "Could not load config from ~A: ~A~%" (config-path) e)
       (format t "Using default values of:~%")
       (format t "  Temperature:~A~%" *current-temp*)
       (format t "  Gamma~A~%:" *gamma*)))
