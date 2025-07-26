@@ -26,6 +26,7 @@ jobs:
     - name: Test binary
       run: |
         ldd ./result/bin/waytemp
+        ls -la ./result/bin/waytemp
         ./result/bin/waytemp --help || echo "Binary exists"
 
     - name: Create release archive
