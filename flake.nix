@@ -55,6 +55,8 @@
             nativeBuildInputs = [ sbcl' ];
             buildInputs = [ waytemp-core ];
 
+            dontStrip = true;
+
             buildPhase = ''
               export HOME=$TMPDIR
               mkdir -p c/
@@ -63,7 +65,8 @@
               sbcl --eval "(declaim (optimize (speed 3) (safety 3) (debug 3)))" \
                    --eval "(load (sb-ext:posix-getenv \"ASDF\"))" \
                    --eval "(push \"$PWD/\" asdf:*central-registry*)" \
-                   --eval "(asdf:make :waytemp)" \
+                   --eval "(asdf:load-system :waytemp)" \
+                   --eval "(sb-ext:save-lisp-and-die \"waytemp\" :toplevel #'waytemp:main :executable t)" \
                    --quit
             '';
 
@@ -84,6 +87,7 @@
 
             dontUnpack = true;
             dontBuild = true;
+            dontStrip = true;
 
             installPhase = ''
               mkdir -p $out/bin $out/lib

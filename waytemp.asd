@@ -1,6 +1,6 @@
 (asdf:defsystem #:waytemp
   :description "Wayland color temperature control daemon"
-  :author "Lukáš Hozda"
+  :author "Lukáš Hozda <me@mag.wiki>"
   :license "COLL"
   :version "0.1.0"
   :serial t
