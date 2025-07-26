@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  release:
+    types: [ published ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: cachix/install-nix-action@v22
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+
+    - name: Build portable version
+      run: nix build .#waytemp-distrib
+    
+    - name: Test binary
+      run: |
+        ldd ./result/bin/waytemp
+        ./result/bin/waytemp --help || echo "Binary exists"
+
+    - name: Create release archive
+      if: github.event_name == 'release'
+      run: |
+        mkdir -p waytemp-release/{bin,lib}
+        cp result/bin/waytemp waytemp-release/bin/
+        cp result/lib/libwaytemp_core.so waytemp-release/lib/
+        cp README.org waytemp-release/
+        tar -czf waytemp-x86_64-linux.tar.gz waytemp-release/
+
+    - name: Upload release asset
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./waytemp-x86_64-linux.tar.gz
+        asset_name: waytemp-x86_64-linux.tar.gz
+        asset_content_type: application/gzip

@@ -75,7 +75,7 @@
           };
 
           # patched libraries
-          waytemp-portable = pkgs.stdenv.mkDerivation {
+          waytemp-distrib = pkgs.stdenv.mkDerivation {
             pname = "waytemp-distrib";
             version = "1.0.0";
             src = self.packages.${system}.waytemp;
