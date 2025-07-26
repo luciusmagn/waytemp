@@ -63,10 +63,12 @@
   "Process Wayland events while daemon is running."
   (loop while (and (not *should-quit*) *waytemp-ctx*)
         do (handler-case
-               (process-waytemp-events)
+               (when *waytemp-ctx*
+                 (process-waytemp-events))
              (error (e)
                (format *error-output* "~&Wayland error: ~A~%" e)
-               (return)))))
+               (return)))
+           (sleep 0.01)))
 
 (defun unix-socket-server ()
   "Main daemon loop handling client connections."
@@ -90,7 +92,8 @@
                          (iolib:socket-os-fd server) :input 0.1)
                       (iolib:poll-timeout () nil))
 
-                    (when (iolib:fd-ready-p (iolib:socket-os-fd server) :input)
+                    (when (and (not *should-quit*)
+                               (iolib:fd-ready-p (iolib:socket-os-fd server) :input))
                       (let ((client (iolib:accept-connection server)))
                         (unwind-protect
                              (handler-case
@@ -105,7 +108,10 @@
                           (close client)))))
                (setf *should-quit* t)
                (when (bt:thread-alive-p wayland-thread)
-                 (bt:join-thread wayland-thread)))))
+                 (bt:destroy-thread wayland-thread)
+                 (sleep 0.1)
+                 (when (bt:thread-alive-p wayland-thread)
+                   (bt:join-thread wayland-thread :timeout 1))))))
       (close server)
       (when (probe-file *socket-path*)
         (delete-file *socket-path*)))))
