@@ -1,0 +1,3 @@
+*-protocol.c linguist-vendored
+*-protocol.h linguist-vendored
+*.xml linguist-vendored
