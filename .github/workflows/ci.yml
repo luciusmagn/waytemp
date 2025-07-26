@@ -41,7 +41,7 @@ jobs:
         cp result/bin/waytemp waytemp-release/bin/
         cp result/lib/libwaytemp_core.so waytemp-release/lib/
         cp README.org waytemp-release/
-        cp LICENSE.org waytemp-release/
+        cp LICENSE.lisp waytemp-release/
         tar -czf waytemp-${VERSION}-x86_64-linux.tar.gz waytemp-release/
 
     - name: Upload release asset
