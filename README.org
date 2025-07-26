@@ -1,5 +1,6 @@
 #+TITLE: waytemp
 #+AUTHOR: Lukáš Hozda
+[[./logo.png]]
 
 A Wayland color temperature control daemon written in Common Lisp inspired by ~wl-sunset~.
 Lets you gradually control the bluelight filter, either by a script, or a binding in your
