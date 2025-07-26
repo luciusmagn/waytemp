@@ -196,7 +196,7 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
 static void registry_handle_global_remove(void *data,
                                           struct wl_registry *registry,
                                           uint32_t name) {
-  // Ignore for now
+  // TODO: Should we do anything here?
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -237,7 +237,7 @@ waytemp_ctx *waytemp_init(void) {
     return NULL;
   }
 
-  // Setup gamma controls for all outputs
+  // setup gamma controls for all outputs
   struct output *output;
   wl_list_for_each(output, &ctx->outputs, link) {
     setup_gamma_control(ctx, output);
@@ -272,13 +272,13 @@ int waytemp_set_temperature(waytemp_ctx *ctx, int temp, double gamma) {
 
   fprintf(stderr, "Setting temp %dK: R=%.3f G=%.3f B=%.3f\n", temp, r, g, b);
 
-  // Store last values for retry
+  // last values for retry
   ctx->last_temp = temp;
   ctx->last_gamma = gamma;
 
   struct output *output;
   wl_list_for_each(output, &ctx->outputs, link) {
-    // Retry failed outputs after 2 seconds
+    // retry failed outputs after 2 seconds
     if (!output->gamma_control && output->retry_count < 10) {
       time_t now = time(NULL);
       if (now - output->last_retry >= 2) {
@@ -315,13 +315,12 @@ int waytemp_set_temperature(waytemp_ctx *ctx, int temp, double gamma) {
 int waytemp_process_events(waytemp_ctx *ctx) {
   int ret = wl_display_dispatch(ctx->display);
 
-  // Periodically retry setting temperature in case of failures
+  // periodically retry setting temperature in case of failures
   static time_t last_retry_check = 0;
   time_t now = time(NULL);
   if (now - last_retry_check >= 5) {
     last_retry_check = now;
 
-    // Check if any outputs need retry
     struct output *output;
     int need_retry = 0;
     wl_list_for_each(output, &ctx->outputs, link) {
@@ -335,6 +334,5 @@ int waytemp_process_events(waytemp_ctx *ctx) {
       waytemp_set_temperature(ctx, ctx->last_temp, ctx->last_gamma);
     }
   }
-
   return ret;
 }
