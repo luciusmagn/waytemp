@@ -1,7 +1,7 @@
 (asdf:defsystem #:waytemp
   :description "Wayland color temperature control daemon"
   :author "Lukáš Hozda"
-  :license "MIT"
+  :license "COLL"
   :version "0.1.0"
   :serial t
   :depends-on (#:cffi
