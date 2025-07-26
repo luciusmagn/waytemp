@@ -23,9 +23,14 @@
 
 (defun config-load (path)
   (with-open-file (stream path)
-    (~> stream
-        (read)
-        (eval))))
+    (let ((*package* (find-package :waytemp))
+          (result nil))
+      (loop for form = (read stream nil :eof)
+            until (eq form :eof)
+            do (setf result (eval form)))
+      (if (typep result 'config)
+          result
+          (error "The last form of your config should evaluate to an instance of the class WAYTEMP:CONFIG")))))
 
 (defun config-save (config path)
   (ensure-directories-exist (uiop:pathname-directory-pathname path))
