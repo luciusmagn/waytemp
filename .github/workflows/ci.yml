@@ -30,16 +30,19 @@ jobs:
       run: |
         ldd ./result/bin/waytemp
         ls -la ./result/bin/waytemp
-        ./result/bin/waytemp --help || echo "Binary exists"
 
     - name: Create release archive
       if: github.event_name == 'release'
       run: |
+        VERSION=$GITHUB_REF_NAME
+        echo "Building release for version: $VERSION"
+
         mkdir -p waytemp-release/{bin,lib}
         cp result/bin/waytemp waytemp-release/bin/
         cp result/lib/libwaytemp_core.so waytemp-release/lib/
         cp README.org waytemp-release/
-        tar -czf waytemp-x86_64-linux.tar.gz waytemp-release/
+        cp LICENSE.org waytemp-release/
+        tar -czf waytemp-${VERSION}-x86_64-linux.tar.gz waytemp-release/
 
     - name: Upload release asset
       if: github.event_name == 'release'
@@ -48,6 +51,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./waytemp-x86_64-linux.tar.gz
-        asset_name: waytemp-x86_64-linux.tar.gz
+        asset_path: ./waytemp-${{ github.ref_name }}-x86_64-linux.tar.gz
+        asset_name: waytemp-${{ github.ref_name }}-x86_64-linux.tar.gz
         asset_content_type: application/gzip
