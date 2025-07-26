@@ -8,6 +8,7 @@
                #:clingon
                #:iolib
                #:alexandria
+               #:serapeum
                #:bordeaux-threads)
   :components ((:module "source"
                 :components

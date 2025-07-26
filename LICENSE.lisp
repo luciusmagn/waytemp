@@ -5,7 +5,6 @@
 ;; conditions and limitations in the function below. The wording of the legal
 ;; terms themselves must remain unmodified to preserve legal clarity.
 ;; Use of this license template is at your own risk.
-
 (asdf:load-system :serapeum)
 (use-package :serapeum)
 
