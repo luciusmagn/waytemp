@@ -1,0 +1,73 @@
+#+TITLE: waytemp
+#+AUTHOR: Lukáš Hozda
+
+A Wayland color temperature control daemon written in Common Lisp inspired by ~wl-sunset~.
+Lets you gradually control the bluelight filter, either by a script, or a binding in your
+window manager.
+
+I use it with a knob on my split keyboard.
+
+* Features
+
+- Adjustable color temperature (1000-25000K)
+- Gamma correction support
+- Daemon/client architecture
+- Persistent configuration
+- Automatic retry on Wayland compositor failures
+
+At the moment, ~waytemp~ does not have any astronomical calculations that ~wl-sunset~ does. Feel free to
+contribute, if you like :)
+
+* Requirements
+
+- Common Lisp implementation (SBCL recommended)
+- Quicklisp
+- C compiler
+- Wayland compositor with gamma control support (~niri~ and ~hyprland~ definitely work, haven't tested others)
+- Development packages on your linux distribution: =wayland-devel=, =wayland-protocols-devel=, =pkg-config=
+
+* Installation
+
+** From source
+
+#+begin_src bash
+git clone git@github.com:luciumagn/waytemp waytemp
+cd waytemp
+make install
+#+end_src
+
+** Manual build
+
+#+begin_src bash
+make
+sbcl --eval "(ql:quickload :waytemp)" --eval "(asdf:make :waytemp)" --quit
+sudo cp waytemp /usr/local/bin/
+#+end_src
+
+* Usage
+
+** Start daemon
+#+begin_src bash
+waytemp daemon
+#+end_src
+
+** Control temperature
+#+begin_src bash
+waytemp get              # Get current temperature
+waytemp set 3500         # Set to 3500K
+waytemp inc 1000         # Increase by 1000K
+waytemp dec              # Decrease by 100K
+waytemp gamma 1.2        # Set gamma to 1.2
+waytemp save-config      # Save current values
+waytemp quit             # Stop daemon
+#+end_src
+
+* Configuration
+
+Configuration is saved to =~/.config/waytemp/config.lisp= and loaded automatically.
+
+
+
+* License
+
+COLL (Configurable Open Lisp License) - see LICENSE.lisp
