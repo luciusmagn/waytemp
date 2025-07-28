@@ -4,8 +4,9 @@ BINDIR = $(PREFIX)/bin
 LIBDIR = $(PREFIX)/lib
 
 LISP ?= sbcl
-LISP_BUILD_CMD = $(LISP) --eval "(declaim (optimize (speed 3) (safety 3) (debug 3)))" \
-                         --eval "(push \"$PWD/\" asdf:*central-registry*)" \
+LISP_BUILD_CMD = $(LISP) --non-interactive \
+                         --eval "(declaim (optimize (speed 3) (safety 3) (debug 3)))" \
+                         --eval "(push *default-pathname-defaults* asdf:*central-registry*)" \
                          --eval "(ql:quickload :waytemp)" \
                          --eval "(asdf:make :waytemp)" \
                          --quit
