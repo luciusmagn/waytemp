@@ -45,6 +45,14 @@ sbcl --eval "(ql:quickload :waytemp)" --eval "(asdf:make :waytemp)" --quit
 sudo cp waytemp /usr/local/bin/
 #+end_src
 
+** Via nix
+There is a Nix flake available, use the ~waytemp-distrib~ derivation to get a portable
+binary.
+
+#+begin_src shell
+nix build .#waytemp-distrib # binaries will be in the ./result folder
+#+end_src
+
 * Usage
 
 ** Start daemon

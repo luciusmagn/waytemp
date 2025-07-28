@@ -22,7 +22,7 @@
 
         waytemp-core = pkgs.stdenv.mkDerivation {
           pname = "waytemp-core";
-          version = "1.0.0";
+          version = "1.0.1";
           src = ./c;
 
           nativeBuildInputs = with pkgs; [
@@ -49,7 +49,7 @@
 
           waytemp = pkgs.stdenv.mkDerivation {
             pname = "waytemp";
-            version = "1.0.0";
+            version = "1.0.1";
             src = ./.;
 
             nativeBuildInputs = [ sbcl' ];
@@ -80,7 +80,7 @@
           # patched libraries
           waytemp-distrib = pkgs.stdenv.mkDerivation {
             pname = "waytemp-distrib";
-            version = "1.0.0";
+            version = "1.0.1";
             src = self.packages.${system}.waytemp;
 
             nativeBuildInputs = [ pkgs.patchelf ];

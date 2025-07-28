@@ -2,7 +2,7 @@
   :description "Wayland color temperature control daemon"
   :author "Lukáš Hozda <me@mag.wiki>"
   :license "COLL"
-  :version "0.1.0"
+  :version "1.0.1"
   :serial t
   :depends-on (#:cffi
                #:clingon
