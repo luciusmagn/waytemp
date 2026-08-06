@@ -9,7 +9,8 @@
                #:iolib
                #:alexandria
                #:serapeum
-               #:bordeaux-threads)
+               #:bordeaux-threads
+               #:uiop)
   :components ((:module "source"
                 :components
                 ((:file "package")
