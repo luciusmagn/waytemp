@@ -1,3 +1,5 @@
+#+sbcl (require :sb-bsd-sockets)
+
 (asdf:defsystem #:waytemp
   :description "Wayland color temperature control daemon"
   :author "Lukáš Hozda <me@mag.wiki>"
@@ -6,7 +8,6 @@
   :serial t
   :depends-on (#:cffi
                #:clingon
-               #:iolib
                #:alexandria
                #:serapeum
                #:bordeaux-threads

@@ -1,19 +1,26 @@
 (in-package #:waytemp)
 
+(defun connect-to-daemon ()
+  "A bidirectional character stream to the daemon's unix socket."
+  (let ((socket (make-instance 'sb-bsd-sockets:local-socket :type :stream)))
+    (sb-bsd-sockets:socket-connect socket *socket-path*)
+    (values (sb-bsd-sockets:socket-make-stream socket :input t :output t
+                                                      :buffering :full
+                                                      :element-type 'character)
+            socket)))
+
 (defun send-command (command &rest args)
   "Send a command to the daemon and return the response."
   (handler-case
-      (let ((socket (iolib:make-socket :address-family :local
-                                       :type :stream
-                                       :connect :active
-                                       :remote-filename *socket-path*)))
+      (multiple-value-bind (stream socket) (connect-to-daemon)
         (unwind-protect
              (progn
-               (prin1 (cons command args) socket)
-               (terpri socket)
-               (finish-output socket)
-               (read socket))
-          (close socket)))
+               (prin1 (cons command args) stream)
+               (terpri stream)
+               (finish-output stream)
+               (read stream))
+          (close stream)
+          (sb-bsd-sockets:socket-close socket)))
     (error (e)
       `(error ,(format nil "Failed to connect to daemon: ~A" e)))))
 

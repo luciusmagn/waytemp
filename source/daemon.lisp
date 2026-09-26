@@ -75,10 +75,9 @@
   (when (probe-file *socket-path*)
     (delete-file *socket-path*))
 
-  (let ((server (iolib:make-socket :address-family :local
-                                   :type :stream
-                                   :connect :passive
-                                   :local-filename *socket-path*)))
+  (let ((server (make-instance 'sb-bsd-sockets:local-socket :type :stream)))
+    (sb-bsd-sockets:socket-bind server *socket-path*)
+    (sb-bsd-sockets:socket-listen server 5)
     (unwind-protect
          (progn
            (format t "~&Daemon listening on ~A~%" *socket-path*)
@@ -87,32 +86,35 @@
                                                  :name "waytemp-wayland")))
              (unwind-protect
                   (loop until *should-quit* do
-                    (handler-case
-                        (iolib:wait-until-fd-ready
-                         (iolib:socket-os-fd server) :input 0.1)
-                      (iolib:poll-timeout () nil))
-
-                    (when (and (not *should-quit*)
-                               (iolib:fd-ready-p (iolib:socket-os-fd server) :input))
-                      (let ((client (iolib:accept-connection server)))
+                    ;; Wake up every 100 ms so a quit request is noticed even
+                    ;; when no client ever connects.
+                    (when (sb-sys:wait-until-fd-usable
+                           (sb-bsd-sockets:socket-file-descriptor server)
+                           :input 0.1)
+                      (let* ((client (sb-bsd-sockets:socket-accept server))
+                             (stream (sb-bsd-sockets:socket-make-stream
+                                      client :input t :output t
+                                      :buffering :full
+                                      :element-type 'character)))
                         (unwind-protect
                              (handler-case
-                                 (let* ((message (read client))
+                                 (let* ((message (read stream))
                                         (response (handle-client-message message)))
-                                   (prin1 response client)
-                                   (terpri client)
-                                   (finish-output client))
+                                   (prin1 response stream)
+                                   (terpri stream)
+                                   (finish-output stream))
                                (error (e)
                                  (format *error-output*
                                          "~&Error handling client: ~A~%" e)))
-                          (close client)))))
+                          (close stream)
+                          (sb-bsd-sockets:socket-close client)))))
                (setf *should-quit* t)
                (when (bt:thread-alive-p wayland-thread)
                  (bt:destroy-thread wayland-thread)
                  (sleep 0.1)
                  (when (bt:thread-alive-p wayland-thread)
                    (bt:join-thread wayland-thread :timeout 1))))))
-      (close server)
+      (sb-bsd-sockets:socket-close server)
       (when (probe-file *socket-path*)
         (delete-file *socket-path*)))))
 
