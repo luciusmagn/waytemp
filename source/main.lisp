@@ -4,10 +4,9 @@
 (defun run-daemon (cmd)
   (declare (ignore cmd))
   (format t "Starting waytemp daemon...~%")
-  (start-daemon)
-  (loop while (and *daemon-thread*
-                   (bt:thread-alive-p *daemon-thread*))
-        do (sleep 1))
+  ;; Serve in this thread: on SBCL builds without futexes (NetBSD), a thread
+  ;; blocked in JOIN-THREAD polls ten times a second.
+  (start-daemon :foreground t)
   (format t "Daemon stopped~%"))
 
 (defun waytemp/daemon ()

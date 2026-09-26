@@ -59,16 +59,31 @@
     (error (e)
       (format *error-output* "~&Failed to set temperature: ~A~%" e))))
 
+(defun wake-socket-server ()
+  "Connect to our own socket so the accept loop wakes up and sees
+*SHOULD-QUIT*."
+  (ignore-errors
+   (let ((socket (make-instance 'sb-bsd-sockets:local-socket :type :stream)))
+     (unwind-protect (sb-bsd-sockets:socket-connect socket *socket-path*)
+       (sb-bsd-sockets:socket-close socket)))))
+
 (defun wayland-event-loop ()
-  "Process Wayland events while daemon is running."
+  "Process Wayland events while daemon is running.  Dispatching blocks until
+the compositor sends something, so an idle daemon never wakes up."
   (loop while (and (not *should-quit*) *waytemp-ctx*)
         do (handler-case
-               (when *waytemp-ctx*
-                 (process-waytemp-events))
+               (when (and *waytemp-ctx* (minusp (process-waytemp-events)))
+                 ;; wl_display_dispatch failed: the connection is gone.
+                 (return))
              (error (e)
                (format *error-output* "~&Wayland error: ~A~%" e)
                (return)))
-           (sleep 0.01)))
+           (sleep 0.01))
+  ;; The compositor went away: stop the daemon too, so the next session's
+  ;; daemon can bind the socket.
+  (unless *should-quit*
+    (setf *should-quit* t)
+    (wake-socket-server)))
 
 (defun unix-socket-server ()
   "Main daemon loop handling client connections."
@@ -86,11 +101,12 @@
                                                  :name "waytemp-wayland")))
              (unwind-protect
                   (loop until *should-quit* do
-                    ;; Wake up every 100 ms so a quit request is noticed even
-                    ;; when no client ever connects.
+                    ;; Block until a client connects.  Quit requests arrive
+                    ;; as clients too, and the Wayland thread connects to
+                    ;; wake us when the compositor goes away.
                     (when (sb-sys:wait-until-fd-usable
                            (sb-bsd-sockets:socket-file-descriptor server)
-                           :input 0.1)
+                           :input)
                       (let* ((client (sb-bsd-sockets:socket-accept server))
                              (stream (sb-bsd-sockets:socket-make-stream
                                       client :input t :output t
@@ -118,8 +134,9 @@
       (when (probe-file *socket-path*)
         (delete-file *socket-path*)))))
 
-(defun start-daemon ()
-  "Start the daemon in a background thread."
+(defun start-daemon (&key foreground)
+  "Start the daemon in a background thread, or with FOREGROUND serve clients
+in the calling thread until the daemon quits."
   (when (and *daemon-thread* (bt:thread-alive-p *daemon-thread*))
     (error "Daemon already running"))
 
@@ -143,9 +160,11 @@
       (format *error-output* "~&Failed to initialize waytemp core: ~A~%" e)
       (return-from start-daemon nil)))
 
-  (setf *daemon-thread*
-        (bt:make-thread #'unix-socket-server
-                        :name "waytemp-daemon"))
+  (if foreground
+      (unix-socket-server)
+      (setf *daemon-thread*
+            (bt:make-thread #'unix-socket-server
+                            :name "waytemp-daemon")))
   t)
 
 (defun stop-daemon ()
